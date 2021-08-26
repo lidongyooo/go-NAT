@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 )
 
 var (
@@ -31,9 +32,11 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("监听:%d端口, 等待客户端连接... \n", serverPort)
+	serConn, err := serLis.Accept()
 
 	for {
-		serConn, err := serLis.Accept()
+		fmt.Println("start")
+
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -45,12 +48,15 @@ func main() {
 			return
 		}
 		request := make([]byte, 10240)
-		netConn.Read(request)
-		serConn.Write(request)
+		netConn.SetDeadline(time.Now().Add(time.Second * 10))
+		n, _ := netConn.Read(request)
+		serConn.Write(request[:n])
 
 		response := make([]byte, 10240)
-		serConn.Read(response)
-		netConn.Write(response)
+		serConn.SetDeadline(time.Now().Add(time.Second * 10))
+		n, _ = serConn.Read(response)
+		netConn.Write(response[:n])
+		fmt.Println("end")
 	}
 
 }
