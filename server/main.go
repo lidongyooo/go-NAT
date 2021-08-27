@@ -21,50 +21,52 @@ func init() {
 func main() {
 	flag.Parse()
 
-	netLis, err := net.Listen("tcp", ":" + strconv.Itoa(netPort))
+	addr, err := net.ResolveTCPAddr("tcp", ":" + strconv.Itoa(netPort))
+	netLis, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("监听:%d端口, 等待网络请求... \n", netPort)
 
-	serLis, err := net.Listen("tcp", ":" + strconv.Itoa(serverPort))
-	if err != nil {
-		panic(err)
-	}
+	addr, err = net.ResolveTCPAddr("tcp", ":" + strconv.Itoa(serverPort))
+	serLis, err := net.ListenTCP("tcp", addr)
 	fmt.Printf("监听:%d端口, 等待客户端连接... \n", serverPort)
-	serConn, err := serLis.Accept()
+	serConn, err := serLis.AcceptTCP()
+	serConn.SetDeadline(time.Now().Add(time.Hour))
+	serConn.SetKeepAlive(true)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 
 	for {
-		fmt.Println("start")
 
+		netConn, err := netLis.AcceptTCP()
+		netConn.SetKeepAlive(true)
+		netConn.SetDeadline(time.Now().Add(time.Hour))
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		netConn, err := netLis.Accept()
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-		request := make([]byte, 10240)
-		netConn.SetDeadline(time.Now().Add(time.Second * 10))
-		n, _ := netConn.Read(request)
-		serConn.Write(request[:n])
+		go func() {
+			for {
+				request := make([]byte, 10240)
+				n, err := netConn.Read(request)
+				fmt.Println("netConn.read", err)
+				_, err = serConn.Write(request[:n])
+				fmt.Println("serConn.write", err)
 
-		response := make([]byte, 10240)
-		serConn.SetDeadline(time.Now().Add(time.Second * 10))
-		n, _ = serConn.Read(response)
-		netConn.Write(response[:n])
-		fmt.Println("end")
+				response := make([]byte, 10240)
+				n, err = serConn.Read(response)
+				fmt.Println("serConn.read", err)
+
+				_, err = netConn.Write(response[:n])
+				fmt.Println("netConn.write", err)
+
+			}
+		}()
 	}
-
-}
-
-func netHandler()  {
-
-}
-
-func serHandler() {
 
 }
